@@ -21,7 +21,7 @@ class ReservationSystem:
                 return True
         return False
 
-    def list_reservations(self, user=None):
-        if user is None:
+    def list_reservations(self, user_id=None):
+        if user_id is None:
             return self.reservations
-        return [r for r in self.reservations if r.user.id == user.id]
+        return [r for r in self.reservations if r.user.id == user_id]
