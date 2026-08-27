@@ -30,7 +30,10 @@ class TestReservationSystem:
 
     def test_add_second_reservation_successful(self):
         self.system.add_reservation(self.user, self.slot)
-        new_slot = utils.create_time_slot(start_time= datetime(2020, 11, 1, 0   , 0, 0), end_time=datetime(2020, 11, 2, 0, 0, 0),)
+        new_slot = utils.create_time_slot(
+            start_time=datetime(2020, 11, 1, 0, 0, 0),
+            end_time=datetime(2020, 11, 2, 0, 0, 0),
+        )
         assert self.system.add_reservation(self.user, new_slot) is True
         assert len(self.system.reservations) == 2
 
@@ -49,5 +52,33 @@ class TestReservationSystem:
     def test_cancel_reservation_no_exist(self):
         self.system.add_reservation(self.user, self.slot)
         assert self.system.cancel_reservation("4") is False
+        assert self.system.reservations[0].status == "Active"
 
+    def test_list_reservations_no_user_returns_all(self):
+        other_user = utils.create_user(name="other_user", email="other_email")
+        other_slot = utils.create_time_slot(
+            start_time=datetime(2020, 11, 1, 0, 0, 0),
+            end_time=datetime(2020, 11, 2, 0, 0, 0),
+        )
+        self.system.add_reservation(self.user, self.slot)
+        self.system.add_reservation(other_user, other_slot)
+
+        result = self.system.list_reservations()
+
+        assert result == self.system.reservations
+        assert len(result) == 2
+
+    def test_list_reservations_filters_by_user(self):
+        other_user = utils.create_user(name="other_user", email="other_email")
+        other_slot = utils.create_time_slot(
+            start_time=datetime(2020, 11, 1, 0, 0, 0),
+            end_time=datetime(2020, 11, 2, 0, 0, 0),
+        )
+        self.system.add_reservation(self.user, self.slot)
+        self.system.add_reservation(other_user, other_slot)
+
+        result = self.system.list_reservations(other_user.id)
+
+        assert len(result) == 1
+        assert result[0].user == other_user
 
