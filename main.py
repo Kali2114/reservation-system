@@ -5,9 +5,8 @@ from persistence import load_data, save_data
 from timeslot import TimeSlot
 from user import User
 
-if __name__ == '__main__':
-    system = load_data("data.json")
-    print("System loaded")
+
+def run(system):
     print("Welcome to the Reservation System")
     while True:
         print("1. Add Reservation")
@@ -44,7 +43,15 @@ if __name__ == '__main__':
             except ValueError:
                 print("Please choose an ID")
         elif choice == 4:
-            save_data(system.reservations, "data.json")
             break
 
 
+def main():
+    system = load_data("data.json")
+    print("System loaded")
+    run(system)
+    save_data(system.reservations, "data.json")
+
+
+if __name__ == '__main__':
+    main()
