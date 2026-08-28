@@ -53,7 +53,8 @@ def load_data(path):
                 read_reservation.id = uuid.UUID(reservation["reservation_id"])
                 read_reservation.status = reservation["status"]
                 system.reservations.append(read_reservation)
-            User.id = next_user_id
+            if reservations:
+                User.id = next_user_id
         return system
     except FileNotFoundError:
         return system
