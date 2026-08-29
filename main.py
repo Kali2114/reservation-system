@@ -1,5 +1,5 @@
 from datetime import datetime
-from persistence import load_data, save_data
+from persistence import load_data, save_data, save_users, load_users
 from timeslot import TimeSlot
 from user_store import UserStore
 
@@ -75,9 +75,11 @@ def run(system, user_store):
 def main():
     system = load_data("data.json")
     user_store = UserStore()
+    user_store.users = load_users("users.json")
     print("System loaded")
     run(system, user_store)
     save_data(system.reservations, "data.json")
+    save_users(user_store.users, "users.json")
 
 
 if __name__ == '__main__':
