@@ -88,3 +88,18 @@ class TestMain:
         main.run(self.system)
         out = capsys.readouterr().out
         assert "Please choose an ID" in out
+
+    def test_add_reservation_invalid_timeslot(self, monkeypatch, capsys):
+        answers = [
+            "1",
+            "Alice",
+            "alice@example.com",
+            "banana",
+            "2020-10-01 00:00",
+            "4"
+        ]
+        monkeypatch.setattr("builtins.input", fake_input(answers))
+        main.run(self.system)
+        out = capsys.readouterr().out
+        assert "Please enter a valid timeslot" in out
+        assert len(self.system.reservations) == 0

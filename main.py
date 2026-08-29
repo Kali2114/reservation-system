@@ -24,7 +24,11 @@ def run(system):
             user = User(name=name, email=email)
             start_time = input("Enter start time YYYY-MM-DD HH:MM: ")
             end_time = input("Enter end time YYYY-MM-DD HH:MM: ")
-            timeslot = TimeSlot(datetime.strptime(start_time, "%Y-%m-%d %H:%M"), datetime.strptime(end_time, "%Y-%m-%d %H:%M"))
+            try:
+                timeslot = TimeSlot(datetime.strptime(start_time, "%Y-%m-%d %H:%M"), datetime.strptime(end_time, "%Y-%m-%d %H:%M"))
+            except ValueError:
+                print("Please enter a valid timeslot")
+                continue
             if system.add_reservation(user, timeslot):
                 print("Reservation added")
             else:
