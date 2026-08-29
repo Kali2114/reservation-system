@@ -9,52 +9,59 @@ from user import User
 
 
 def save_data(reservations, path):
+    payload = [_reservation_to_dict(r) for r in reservations]
     with open(path, "w") as f:
-        reservation_list = []
-        for reservation in reservations:
-            reservation_dict = {
-                "reservation_id": str(reservation.id),
-                "reservation_user": {
-                    "user_id": reservation.user.id,
-                    "user_name": reservation.user.name,
-                    "user_email": reservation.user.email,
-                },
-                "reservation_slot": {
-                    "start_time": reservation.slot.start_time.isoformat(),
-                    "end_time": reservation.slot.end_time.isoformat(),
-                },
-                "status": reservation.status
-            }
-            reservation_list.append(reservation_dict)
-        json.dump(reservation_list, f)
+        json.dump(payload, f)
 
 
 def load_data(path):
     system = ReservationSystem()
     try:
         with open(path, "r") as f:
-            reservations = json.load(f)
-            next_user_id = 0
-            users = {}
-            for reservation in reservations:
-                user_id = reservation["reservation_user"]["user_id"]
-                if user_id not in users:
-                    user = User(reservation["reservation_user"]["user_name"], reservation["reservation_user"]["user_email"])
-                    user.id = reservation["reservation_user"]["user_id"]
-                    users[user_id] = user
-                else:
-                    user = users[user_id]
-                if user.id >= next_user_id:
-                    next_user_id = user.id + 1
-                time_slot_start = datetime.fromisoformat(reservation["reservation_slot"]["start_time"])
-                time_slot_end = datetime.fromisoformat(reservation["reservation_slot"]["end_time"])
-                timeslot = TimeSlot(time_slot_start, time_slot_end)
-                read_reservation = Reservation(user, timeslot)
-                read_reservation.id = uuid.UUID(reservation["reservation_id"])
-                read_reservation.status = reservation["status"]
-                system.reservations.append(read_reservation)
-            if reservations:
-                User.id = next_user_id
-        return system
+            raw_reservations = json.load(f)
     except FileNotFoundError:
         return system
+
+    users = {}
+    for raw in raw_reservations:
+        user = _get_or_create_user(raw["reservation_user"], users)
+        system.reservations.append(_reservation_from_dict(raw, user))
+
+    if users:
+        User.id = max(user.id for user in users.values()) + 1
+
+    return system
+
+
+def _reservation_to_dict(reservation):
+    return {
+        "reservation_id": str(reservation.id),
+        "reservation_user": {
+            "user_id": reservation.user.id,
+            "user_name": reservation.user.name,
+            "user_email": reservation.user.email,
+        },
+        "reservation_slot": {
+            "start_time": reservation.slot.start_time.isoformat(),
+            "end_time": reservation.slot.end_time.isoformat(),
+        },
+        "status": reservation.status,
+    }
+
+
+def _get_or_create_user(raw_user, users):
+    user_id = raw_user["user_id"]
+    if user_id not in users:
+        user = User(raw_user["user_name"], raw_user["user_email"])
+        user.id = user_id
+        users[user_id] = user
+    return users[user_id]
+
+
+def _reservation_from_dict(raw, user):
+    start_time = datetime.fromisoformat(raw["reservation_slot"]["start_time"])
+    end_time = datetime.fromisoformat(raw["reservation_slot"]["end_time"])
+    reservation = Reservation(user, TimeSlot(start_time, end_time))
+    reservation.id = uuid.UUID(raw["reservation_id"])
+    reservation.status = raw["status"]
+    return reservation

@@ -8,6 +8,8 @@ def create_user(**kwargs):
     data = {
         "name": "test_user",
         "email": "test_email",
+        "password": "test_password",
+        "salt": "test_salt",
     }
     data.update(kwargs)
     return User(**data)
