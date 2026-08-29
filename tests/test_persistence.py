@@ -40,7 +40,7 @@ class TestPersistence:
 
         assert len(result.reservations) == 1
         r = result.reservations[0]
-        assert r.user is self.user            # resolved from the store, not rebuilt
+        assert r.user is self.user
         assert r.slot.start_time == self.slot.start_time
         assert r.slot.end_time == self.slot.end_time
         assert r.status == "Active"
@@ -98,9 +98,7 @@ class TestPersistence:
         save_data(self.system.reservations, path)
 
         with pytest.raises(ValueError):
-            load_data(path, UserStore())   # empty store -> user not found
-
-    # --- load_users -----------------------------------------------------------
+            load_data(path, UserStore())
 
     def test_load_users_missing_file(self, tmp_path):
         result = load_users(tmp_path / "missing_file.json")
