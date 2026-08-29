@@ -1,3 +1,5 @@
+import pytest
+
 from user import User
 from persistence import load_data, save_data, load_users, save_users
 from reservation_system import ReservationSystem
@@ -18,22 +20,27 @@ class TestPersistence:
             end_time=datetime(2020, 11, 2, 0, 0, 0),
         )
 
+    def _store_fixture_user(self):
+        # load_data resolves reservation users out of the store by email
+        self.user_store.users[self.user.email] = self.user
+
+    # --- load_data --------------------------------------------------------------
+
     def test_load_data_missing_file(self, tmp_path):
-        result = load_data(tmp_path / "missing_file.json")
+        result = load_data(tmp_path / "missing_file.json", self.user_store)
         assert result.reservations == []
 
     def test_round_trip_save_load(self, tmp_path):
         path = tmp_path / "data.json"
+        self._store_fixture_user()
         self.system.add_reservation(self.user, self.slot)
 
         save_data(self.system.reservations, path)
-        result = load_data(path)
+        result = load_data(path, self.user_store)
 
         assert len(result.reservations) == 1
         r = result.reservations[0]
-        assert r.user.name == self.user.name
-        assert r.user.email == self.user.email
-        assert r.user.id == self.user.id
+        assert r.user is self.user            # resolved from the store, not rebuilt
         assert r.slot.start_time == self.slot.start_time
         assert r.slot.end_time == self.slot.end_time
         assert r.status == "Active"
@@ -41,37 +48,59 @@ class TestPersistence:
 
     def test_dedup_save_data(self, tmp_path):
         path = tmp_path / "data.json"
+        self._store_fixture_user()
         self.system.add_reservation(self.user, self.slot)
         self.system.add_reservation(self.user, self.other_slot)
+
         save_data(self.system.reservations, path)
-        result = load_data(path)
+        result = load_data(path, self.user_store)
+
         assert len(result.reservations) == 2
         assert result.reservations[0].user is result.reservations[1].user
 
-    def test_load_user_id(self, tmp_path):
-        path = tmp_path / "users.json"
+    def test_load_data_restores_id_counter(self, tmp_path):
+        path = tmp_path / "data.json"
+        self._store_fixture_user()
         self.system.add_reservation(self.user, self.slot)
         self.user.id = 50
+
         save_data(self.system.reservations, path)
-        load_data(path)
+        load_data(path, self.user_store)
+
         new_user = utils.create_user(name="new_user")
         assert new_user.id == 51
 
-    def test_load_user_id_no_data(self, tmp_path):
-        path = tmp_path / "users.json"
+    def test_load_data_empty_leaves_id_counter(self, tmp_path):
+        path = tmp_path / "data.json"
         save_data(self.system.reservations, path)
         User.id = 1
-        load_data(path)
+
+        load_data(path, UserStore())
+
         new_user = utils.create_user(name="new_user")
         assert new_user.id == 1
 
     def test_load_cancelled_status(self, tmp_path):
-        path = tmp_path / "users.json"
+        path = tmp_path / "data.json"
+        self._store_fixture_user()
         self.system.add_reservation(self.user, self.slot)
         self.system.reservations[0].status = "Cancelled"
+
         save_data(self.system.reservations, path)
-        result = load_data(path)
+        result = load_data(path, self.user_store)
+
         assert result.reservations[0].status == "Cancelled"
+
+    def test_load_data_unknown_user_raises(self, tmp_path):
+        path = tmp_path / "data.json"
+        self._store_fixture_user()
+        self.system.add_reservation(self.user, self.slot)
+        save_data(self.system.reservations, path)
+
+        with pytest.raises(ValueError):
+            load_data(path, UserStore())   # empty store -> user not found
+
+    # --- load_users -----------------------------------------------------------
 
     def test_load_users_missing_file(self, tmp_path):
         result = load_users(tmp_path / "missing_file.json")
@@ -112,4 +141,3 @@ class TestPersistence:
         save_users(self.user_store.users, path)
         load_users(path)
         assert User.id == 501
-

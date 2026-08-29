@@ -19,7 +19,7 @@ def _restore_user_id_counter(users):
         User.id = max(u.id for u in users.values()) + 1
 
 
-def load_data(path):
+def load_data(path, user_store):
     system = ReservationSystem()
     try:
         with open(path, "r") as f:
@@ -27,9 +27,13 @@ def load_data(path):
     except FileNotFoundError:
         return system
 
-    users = {}
+    users = user_store.users
     for raw in raw_reservations:
-        user = _get_or_create_user(raw["reservation_user"], users)
+        user_email = raw["reservation_user"]["user_email"]
+        try:
+            user = users[user_email]
+        except KeyError:
+            raise ValueError(f"reservation references unknown user {user_email}")
         system.reservations.append(_reservation_from_dict(raw, user))
 
     _restore_user_id_counter(users)
@@ -51,15 +55,6 @@ def _reservation_to_dict(reservation):
         },
         "status": reservation.status,
     }
-
-
-def _get_or_create_user(raw_user, users):
-    user_id = raw_user["user_id"]
-    if user_id not in users:
-        user = User(raw_user["user_name"], raw_user["user_email"])
-        user.id = user_id
-        users[user_id] = user
-    return users[user_id]
 
 
 def _reservation_from_dict(raw, user):

@@ -73,9 +73,9 @@ def run(system, user_store):
 
 
 def main():
-    system = load_data("data.json")
     user_store = UserStore()
     user_store.users = load_users("users.json")
+    system = load_data("data.json", user_store)
     print("System loaded")
     run(system, user_store)
     save_data(system.reservations, "data.json")
