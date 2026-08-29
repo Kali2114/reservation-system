@@ -8,7 +8,7 @@ def create_user(**kwargs):
     data = {
         "name": "test_user",
         "email": "test_email",
-        "password": "test_password",
+        "password_hash": "test_hash",
         "salt": "test_salt",
     }
     data.update(kwargs)

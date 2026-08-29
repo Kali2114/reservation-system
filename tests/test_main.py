@@ -1,5 +1,6 @@
 import main
 from reservation_system import ReservationSystem
+from user_store import UserStore
 
 
 def fake_input(answers):
@@ -12,94 +13,112 @@ def fake_input(answers):
     return lambda prompt="": next(it)
 
 
+# Register a user and log in as them, leaving the session at the
+# reservation menu.
+LOGIN_PREFIX = [
+    "1", "Alice", "alice@example.com", "secret",   # 1. Register
+    "2", "alice@example.com", "secret",            # 2. Login
+]
+
+# Leave the reservation menu (4. Logout), then the auth menu (3. Exit).
+LOGOUT_EXIT = ["4", "3"]
+
+
 class TestMain:
 
     def setup_method(self):
         self.system = ReservationSystem()
+        self.user_store = UserStore()
+
+    def drive(self, answers, monkeypatch, capsys):
+        monkeypatch.setattr("builtins.input", fake_input(answers))
+        main.run(self.system, self.user_store)
+        return capsys.readouterr().out
+
+    # --- auth menu ----------------------------------------------------------
+
+    def test_exit_from_auth_menu(self, monkeypatch, capsys):
+        out = self.drive(["3"], monkeypatch, capsys)
+        assert "Bye" in out
+
+    def test_invalid_auth_choice(self, monkeypatch, capsys):
+        out = self.drive(["abc", "3"], monkeypatch, capsys)
+        assert "Please choose an option" in out
+
+    def test_register_then_login(self, monkeypatch, capsys):
+        out = self.drive([*LOGIN_PREFIX, *LOGOUT_EXIT], monkeypatch, capsys)
+        assert "Registered" in out
+        assert "alice@example.com" in self.user_store.users
+
+    def test_register_duplicate_email(self, monkeypatch, capsys):
+        answers = [
+            "1", "Alice", "alice@example.com", "secret",
+            "1", "Bob", "alice@example.com", "other",
+            "3",
+        ]
+        out = self.drive(answers, monkeypatch, capsys)
+        assert "email already registered" in out
+
+    def test_login_wrong_password(self, monkeypatch, capsys):
+        answers = [
+            "1", "Alice", "alice@example.com", "secret",
+            "2", "alice@example.com", "wrong",
+            "3",
+        ]
+        out = self.drive(answers, monkeypatch, capsys)
+        assert "invalid email or password" in out
+
+    # --- reservation menu -------------------------------------------------------
 
     def test_add_reservation_happy_path(self, monkeypatch, capsys):
         answers = [
-            "1",
-            "Alice",
-            "alice@example.com",
-            "2020-10-01 00:00",
-            "2020-10-02 00:00",
-            "4",
+            *LOGIN_PREFIX,
+            "1", "2020-10-01 00:00", "2020-10-02 00:00",
+            *LOGOUT_EXIT,
         ]
-        monkeypatch.setattr("builtins.input", fake_input(answers))
-
-        main.run(self.system)
-
-        out = capsys.readouterr().out
+        out = self.drive(answers, monkeypatch, capsys)
         assert "Reservation added" in out
         assert len(self.system.reservations) == 1
+        assert self.system.reservations[0].user.email == "alice@example.com"
 
-    def test_add_reservation_overlapping_path(self, monkeypatch, capsys):
+    def test_add_reservation_overlapping(self, monkeypatch, capsys):
         answers = [
-            "1",
-            "Alice",
-            "alice@example.com",
-            "2020-10-01 00:00",
-            "2020-10-02 00:00",
-
-            "1",
-            "Alice",
-            "alice@example.com",
-            "2020-10-01 23:59",
-            "2020-10-02 10:00",
-            "4",
+            *LOGIN_PREFIX,
+            "1", "2020-10-01 00:00", "2020-10-02 00:00",
+            "1", "2020-10-01 12:00", "2020-10-02 06:00",
+            *LOGOUT_EXIT,
         ]
-        monkeypatch.setattr("builtins.input", fake_input(answers) )
-        main.run(self.system)
-        out = capsys.readouterr().out
+        out = self.drive(answers, monkeypatch, capsys)
         assert "Reservation not added" in out
         assert len(self.system.reservations) == 1
 
-    def test_invalid_menu_choice(self, monkeypatch, capsys):
-        answers = [
-            "abs",
-            "4",
-        ]
-
-        monkeypatch.setattr("builtins.input", fake_input(answers))
-        main.run(self.system)
-        out = capsys.readouterr().out
-        assert "Please choose an option" in out
-
-    def test_cancel_unkown_id(self, monkeypatch, capsys):
-        answers = [
-            "2",
-            "nope",
-            "4"
-        ]
-
-        monkeypatch.setattr("builtins.input", fake_input(answers))
-        main.run(self.system)
-        out = capsys.readouterr().out
-        assert "Reservation not found or already cancelled" in out
-
-    def test_list_bad_user_id(self, monkeypatch, capsys):
-        answers = [
-            "3",
-            "abc",
-            "4"
-        ]
-        monkeypatch.setattr("builtins.input", fake_input(answers))
-        main.run(self.system)
-        out = capsys.readouterr().out
-        assert "Please choose an ID" in out
-
     def test_add_reservation_invalid_timeslot(self, monkeypatch, capsys):
         answers = [
-            "1",
-            "Alice",
-            "alice@example.com",
-            "banana",
-            "2020-10-01 00:00",
-            "4"
+            *LOGIN_PREFIX,
+            "1", "banana", "2020-10-01 00:00",
+            *LOGOUT_EXIT,
         ]
-        monkeypatch.setattr("builtins.input", fake_input(answers))
-        main.run(self.system)
-        out = capsys.readouterr().out
+        out = self.drive(answers, monkeypatch, capsys)
         assert "Please enter a valid timeslot" in out
         assert len(self.system.reservations) == 0
+
+    def test_invalid_menu_choice(self, monkeypatch, capsys):
+        answers = [*LOGIN_PREFIX, "abc", *LOGOUT_EXIT]
+        out = self.drive(answers, monkeypatch, capsys)
+        assert "Please choose an option" in out
+
+    def test_cancel_unknown_id(self, monkeypatch, capsys):
+        answers = [*LOGIN_PREFIX, "2", "nonexistent-id", *LOGOUT_EXIT]
+        out = self.drive(answers, monkeypatch, capsys)
+        assert "Reservation not found or already cancelled" in out
+
+    def test_list_shows_own_reservations(self, monkeypatch, capsys):
+        answers = [
+            *LOGIN_PREFIX,
+            "1", "2020-10-01 00:00", "2020-10-02 00:00",
+            "3",
+            *LOGOUT_EXIT,
+        ]
+        out = self.drive(answers, monkeypatch, capsys)
+        assert "Reservation added" in out
+        assert "Alice" in out
