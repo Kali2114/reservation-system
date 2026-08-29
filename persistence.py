@@ -65,3 +65,14 @@ def _reservation_from_dict(raw, user):
     reservation.id = uuid.UUID(raw["reservation_id"])
     reservation.status = raw["status"]
     return reservation
+
+
+def save_users(users, path):
+    payload = {email: {
+        "name": value.name,
+        "email": value.email,
+        "password_hash": value.password_hash.hex(),
+        "salt": value.salt.hex()
+    } for email, value in users.items()}
+    with open(path, "w") as f:
+        json.dump(payload, f)
