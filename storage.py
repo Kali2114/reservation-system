@@ -1,5 +1,7 @@
 import sqlite3
 
+from user import User
+
 
 class Storage:
     def __init__(self, path):
@@ -31,3 +33,29 @@ class Storage:
             )"""
         )
         self.conn.commit()
+
+    def save_users(self, user_store):
+        with self.conn:
+            self.conn.execute("DELETE FROM users")
+            for user in user_store.users.values():
+                cur = self.conn.execute(
+                    """INSERT INTO users (name, email, password_hash, salt) VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        user.name,
+                        user.email,
+                        user.password_hash,
+                        user.salt,
+                    )
+                )
+                user.id = cur.lastrowid
+
+    def load_users(self):
+        users = {}
+        for row in self.conn.execute(
+            "SELECT id, name, email, password_hash, salt FROM users"
+        ):
+            user = User(row["name"], row["email"], row["password_hash"], row["salt"])
+            user.id = row["id"]
+            users[row["email"]] = user
+        return users
