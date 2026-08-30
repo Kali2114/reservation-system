@@ -1,5 +1,7 @@
 from user_store import UserStore
 from storage import Storage
+from reservation_system import ReservationSystem
+from . import utils
 
 
 def test_schema_init_is_idempotent(tmp_path):
@@ -70,5 +72,29 @@ def test_round_trip_save_load_users(tmp_path):
     assert loaded_users[user2.email].email == user2.email
     assert loaded_users[user2.email].password_hash == user2.password_hash
     assert loaded_users[user2.email].salt == user2.salt
+
+
+def test_save_reservations(tmp_path):
+    storage = Storage(tmp_path / "test.db")
+    user_storage = UserStore()
+    payload = {
+        "name": "test_user",
+        "email": "test_email",
+        "password": "test_password",
+    }
+    user = user_storage.register(**payload)
+    slot = utils.create_time_slot()
+    system = ReservationSystem()
+    system.add_reservation(user=user, slot=slot)
+    reservation = system.reservations[0]
+    storage.save_users(user_storage)
+    storage.save_reservations(system)
+    rows = storage.conn.execute("SELECT * FROM reservations").fetchall()
+    assert len(rows) == 1
+    assert rows[0]["user_email"] == user.email
+    assert rows[0]["id"] == str(reservation.id)
+    assert rows[0]["status"] == "Active"
+
+
 
 

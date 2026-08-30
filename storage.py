@@ -59,3 +59,17 @@ class Storage:
             user.id = row["id"]
             users[row["email"]] = user
         return users
+
+    def save_reservations(self, system):
+        with self.conn:
+            self.conn.execute("DELETE FROM reservations")
+            for reservation in system.reservations:
+                self.conn.execute(
+                    """INSERT INTO reservations (id, user_email, start_time, end_time, status) VALUES (?, ?, ?, ?, ?)""",(
+                    str(reservation.id),
+                    reservation.user.email,
+                    reservation.slot.start_time.isoformat(),
+                    reservation.slot.end_time.isoformat(),
+                    reservation.status
+                    )
+                )
