@@ -1,6 +1,10 @@
 import sqlite3
+import uuid
+from datetime import datetime
 
 from user import User
+from reservation import Reservation
+from timeslot import TimeSlot
 
 
 class Storage:
@@ -73,3 +77,25 @@ class Storage:
                     reservation.status
                     )
                 )
+
+    def load_reservations(self, user_storage):
+        reservations = []
+        for row in self.conn.execute(
+            "SELECT id, user_email, start_time, end_time, status FROM reservations"
+        ):
+            try:
+                user = user_storage.users[row["user_email"]]
+            except KeyError:
+                raise ValueError(f"reservation references unknown user {row['user_email']}")
+            start_time = datetime.fromisoformat(row["start_time"])
+            end_time = datetime.fromisoformat(row["end_time"])
+            slot = TimeSlot(start_time, end_time)
+            reservation = Reservation(
+                user,
+                slot,
+            )
+            reservation.id = uuid.UUID(row["id"])
+            reservation.status = row["status"]
+            reservations.append(reservation)
+        return reservations
+
