@@ -122,3 +122,54 @@ class TestMain:
         out = self.drive(answers, monkeypatch, capsys)
         assert "Reservation added" in out
         assert "Alice" in out
+
+
+class TestMainPersistence:
+    """main() drives a full load -> run -> save cycle against a real db file."""
+
+    def test_account_survives_restart(self, tmp_path, monkeypatch, capsys):
+        db = tmp_path / "reservate.db"
+
+        # run 1: register, then exit
+        monkeypatch.setattr(
+            "builtins.input", fake_input(["1", "Alice", "a@x.com", "pw", "3"])
+        )
+        main.main(db_path=db)
+        capsys.readouterr()
+
+        # run 2: the account is still there, so login reaches the menu
+        monkeypatch.setattr(
+            "builtins.input", fake_input(["2", "a@x.com", "pw", "4", "3"])
+        )
+        main.main(db_path=db)
+        out = capsys.readouterr().out
+        assert "invalid email or password" not in out
+        assert "Add Reservation" in out
+
+    def test_reservation_survives_restart(self, tmp_path, monkeypatch, capsys):
+        db = tmp_path / "reservate.db"
+
+        monkeypatch.setattr("builtins.input", fake_input([
+            "1", "Alice", "a@x.com", "pw",
+            "2", "a@x.com", "pw",
+            "1", "2020-10-01 00:00", "2020-10-02 00:00",
+            "4", "3",
+        ]))
+        main.main(db_path=db)
+        capsys.readouterr()
+
+        monkeypatch.setattr(
+            "builtins.input", fake_input(["2", "a@x.com", "pw", "3", "4", "3"])
+        )
+        main.main(db_path=db)
+        out = capsys.readouterr().out
+        assert "2020-10-01 00:00:00" in out
+        assert "Alice" in out
+
+    def test_fresh_db_starts_empty(self, tmp_path, monkeypatch, capsys):
+        db = tmp_path / "reservate.db"
+        monkeypatch.setattr("builtins.input", fake_input(["3"]))
+        main.main(db_path=db)
+        out = capsys.readouterr().out
+        assert "System loaded" in out
+        assert "Bye" in out

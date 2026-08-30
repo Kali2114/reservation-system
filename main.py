@@ -1,7 +1,8 @@
 from datetime import datetime
-from persistence import load_data, save_data, save_users, load_users
 from timeslot import TimeSlot
-from user_store import UserStore
+from storage import Storage
+
+DB_PATH = "reservate.db"
 
 
 def run(system, user_store):
@@ -72,14 +73,13 @@ def run(system, user_store):
                 break
 
 
-def main():
-    user_store = UserStore()
-    user_store.users = load_users("users.json")
-    system = load_data("data.json", user_store)
+def main(db_path=DB_PATH):
+    storage = Storage(db_path)
+    system, user_store = storage.load()
     print("System loaded")
     run(system, user_store)
-    save_data(system.reservations, "data.json")
-    save_users(user_store.users, "users.json")
+    storage.save(system, user_store)
+    storage.close()
 
 
 if __name__ == '__main__':

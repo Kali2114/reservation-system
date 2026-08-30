@@ -4,7 +4,9 @@ from datetime import datetime
 
 from user import User
 from reservation import Reservation
+from reservation_system import ReservationSystem
 from timeslot import TimeSlot
+from user_store import UserStore
 
 
 class Storage:
@@ -33,7 +35,7 @@ class Storage:
             start_time TEXT NOT NULL,
             end_time TEXT NOT NULL,
             status TEXT NOT NULL,
-            FOREIGN KEY (user_email) REFERENCES users(email)
+            FOREIGN KEY (user_email) REFERENCES users(email) ON DELETE CASCADE
             )"""
         )
         self.conn.commit()
@@ -98,4 +100,18 @@ class Storage:
             reservation.status = row["status"]
             reservations.append(reservation)
         return reservations
+
+    def load(self):
+        user_store = UserStore()
+        user_store.users = self.load_users()
+        system = ReservationSystem()
+        system.reservations = self.load_reservations(user_store)
+        return system, user_store
+
+    def save(self, system, user_store):
+        self.save_users(user_store)
+        self.save_reservations(system)
+
+    def close(self):
+        self.conn.close()
 
